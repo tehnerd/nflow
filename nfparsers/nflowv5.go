@@ -52,15 +52,15 @@ func NFV5HeaderUnpack(hdr []byte) NFLOWv5Header{
     return header
 }
 
-func NFV5RecordUnpack(hdr []byte, flow_count uint16) map[uint32]NFLOWv5Record {
-    flow_dict := make(map[uint32]NFLOWv5Record)
+func NFV5RecordUnpack(hdr []byte, flow_count uint16) map[int]NFLOWv5Record {
+    flow_dict := make(map[int]NFLOWv5Record)
     for cntr := 0; cntr < int(flow_count); cntr++{
         var record NFLOWv5Record
         err := binary.Read(bytes.NewReader(hdr[24*cntr:24*cntr+48]), binary.BigEndian, &record)
         if err != nil {
             fmt.Println("binary.Read failed:", err)
         }
-        flow_dict[record.Dstaddr] = record
+        flow_dict[cntr] = record
     }
     return flow_dict
 }
