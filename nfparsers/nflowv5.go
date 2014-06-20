@@ -52,22 +52,27 @@ func NFV5HeaderUnpack(hdr []byte) NFLOWv5Header{
     return header
 }
 
-func NFV5RecordUnpack(hdr []byte, flow_count uint16) map[int]NFLOWv5Record {
-    flow_dict := make(map[int]NFLOWv5Record)
+func NFV5RecordUnpack(hdr []byte, flow_count uint16) []NFLOWv5Record {
+    flow_list := make([]NFLOWv5Record, 31)
+    //nflowv5's packets cant contains more than 30 records
+    if flow_count > 30{
+        return flow_list
+    }
     for cntr := 0; cntr < int(flow_count); cntr++{
         var record NFLOWv5Record
         err := binary.Read(bytes.NewReader(hdr[24*cntr:24*cntr+48]), binary.BigEndian, &record)
         if err != nil {
             fmt.Println("binary.Read failed:", err)
         }
-        flow_dict[cntr] = record
+        flow_list[cntr] = record
     }
-    return flow_dict
+    return flow_list
 }
 
-func NFV5ParsePacket(packet []byte){
+func NFV5ParsePacket(packet []byte) []NFLOWv5Record{
     header := NFV5HeaderUnpack(packet)
-    NFV5RecordUnpack(packet,header.Count)
+    flow_list := NFV5RecordUnpack(packet,header.Count)
+    return flow_list
 }
 
 func Test() {
