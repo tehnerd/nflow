@@ -24,6 +24,11 @@ type IPFIXTmpltHeader struct {
     FieldCount uint16
 }
 
+type IPFIXIETFElem struct {
+    IEID uint16
+    FieldLength uint16
+}
+
 func IPFIXMsgHeaderUnpack(hdr []byte) IPFIXMsgHeader {
     var header IPFIXMsgHeader
     err := binary.Read(bytes.NewReader(hdr[:16]), binary.BigEndian, &header)
@@ -59,20 +64,30 @@ func IPFIXParseTmpltSet(packet []byte, agent_ip uint32,
     if exist {
         return
     }
+
+    ipfix_tmplt_len[agent_ip] = make(map[uint16]map[uint16]uint16)
+    ipfix_tmplt_len[agent_ip][tmplt_header.TmpltID] = make(map[uint16]uint16)
+    ipfix_tmplt_fields[agent_ip] = make(map[uint16]map[uint16]uint8)
+    ipfix_tmplt_fields[agent_ip][tmplt_header.TmpltID] = make(map[uint16]uint8)
+
     offset := 24
     for cntr := uint16(0); cntr < tmplt_header.FieldCount; cntr++{
-        var IEID uint16
-        err := binary.Read(bytes.NewReader(packet[offset:offset+2]), binary.BigEndian, &IEID)
+        var fspec IPFIXIETFElem
+        err := binary.Read(bytes.NewReader(packet[offset:offset+4]), binary.BigEndian, &fspec)
         if err != nil {
-            fmt.Println("binary.Read failed:", err)
+            fmt.Println("IETF Parsing. binary.Read failed:", err)
         }
-        fmt.Println(IEID)
-        if (IEID >> 15) == 0 {
+        if (fspec.IEID >> 15) == 0 {
+            ipfix_tmplt_len[agent_ip][tmplt_header.TmpltID][cntr] = fspec.FieldLength
+            ipfix_tmplt_fields[agent_ip][tmplt_header.TmpltID][cntr] = uint8(fspec.IEID)
             offset += 4
+
         } else {
             offset += 8
         }
     }
+    fmt.Println(ipfix_tmplt_len)
+    fmt.Println(ipfix_tmplt_fields)
 
 }
 
