@@ -23,6 +23,16 @@ func inet_ntoa(ipnr int64) net.IP {
     return net.IPv4(bytes[3],bytes[2],bytes[1],bytes[0])
 }
 
+func addr2uint32(addr *net.UDPAddr) uint32 {
+        a := (*addr).IP.To4()
+        var u uint32
+        u |= uint32(a[0])
+        u |= uint32(a[1]) << 8
+        u |= uint32(a[2]) << 16
+        u |= uint32(a[3]) << 24
+        return u
+}
+
 func string_to_uint32(ip string) uint32 {
     bits := strings.Split(ip, ".")
     b0, _ := strconv.Atoi(bits[0])
@@ -46,7 +56,9 @@ func collect_flow(sock *net.UDPConn, mutex *sync.RWMutex,
                   vips_multiplier map[uint32]uint8){
     buffer := make([]byte, 9000)
     for {
-        n,_,_ := sock.ReadFromUDP(buffer)
+        ipfix_tmplt_len := make(map[uint32]map[uint16]map[uint16]uint16)
+        ipfix_tmplt_fields := make(map[uint32]map[uint16]map[uint16]uint8)
+        n,addr,_ := sock.ReadFromUDP(buffer)
         switch buffer[1] {
             case 5:
                 flow_list := nfparsers.NFV5ParsePacket(buffer[:n])
@@ -60,6 +72,9 @@ func collect_flow(sock *net.UDPConn, mutex *sync.RWMutex,
                         mutex.Unlock()
                     }
                 }
+            case 10:
+                nfparsers.IPFIXParsePacket(buffer[:n],addr2uint32(addr),
+                                 ipfix_tmplt_len, ipfix_tmplt_fields)
         }
     }
 }
@@ -73,8 +88,8 @@ func analyze_stats(mutex *sync.RWMutex,
     for k,v := range vips_pps {
         if(v != uint32(0)) {
             if(vips_baseline[k] != uint32(0)) {
-                if v > vips_baseline[k]*uint32(vips_multiplier[k]){
-                    fmt.Println("possible ddos")
+                if (v > 10 && v > vips_baseline[k]*uint32(vips_multiplier[k])){
+                    fmt.Println("possible ddos on")
                     vips_flags[k] = uint8(1)
                 } else {
                     vips_flags[k] = uint8(0)
