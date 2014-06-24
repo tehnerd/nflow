@@ -55,12 +55,12 @@ func collect_flow(sock *net.UDPConn, mutex *sync.RWMutex,
                   vips_baseline map[uint32]uint32,
                   vips_multiplier map[uint32]uint8){
     buffer := make([]byte, 9000)
+    ipfix_tmplt_len := make(map[uint32]map[uint16]map[uint16]uint16)
+    ipfix_tmplt_fields := make(map[uint32]map[uint16]map[uint16]uint8)
     for {
-        ipfix_tmplt_len := make(map[uint32]map[uint16]map[uint16]uint16)
-        ipfix_tmplt_fields := make(map[uint32]map[uint16]map[uint16]uint8)
         n,addr,_ := sock.ReadFromUDP(buffer)
         switch buffer[1] {
-            case 5:
+            case 5:{
                 flow_list := nfparsers.NFV5ParsePacket(buffer[:n])
                 for cntr := 0; cntr < len(flow_list); cntr++{
                     mutex.RLock()
@@ -72,9 +72,11 @@ func collect_flow(sock *net.UDPConn, mutex *sync.RWMutex,
                         mutex.Unlock()
                     }
                 }
-            case 10:
+            }
+            case 10:{
                 nfparsers.IPFIXParsePacket(buffer[:n],addr2uint32(addr),
                                  ipfix_tmplt_len, ipfix_tmplt_fields)
+            }
         }
     }
 }

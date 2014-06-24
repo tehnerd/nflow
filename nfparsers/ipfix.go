@@ -61,7 +61,8 @@ func IPFIXParseTmpltSet(packet []byte, agent_ip uint32,
                         ipfix_tmplt_fields map[uint32]map[uint16]map[uint16]uint8){
     tmplt_header := IPFIXTmpltHeaderUnpack(packet)
     _,exist := ipfix_tmplt_len[agent_ip][tmplt_header.TmpltID][0]
-    if exist {
+    if exist{
+        fmt.Println("exist")
         return
     }
 
@@ -86,9 +87,6 @@ func IPFIXParseTmpltSet(packet []byte, agent_ip uint32,
             offset += 8
         }
     }
-    fmt.Println(ipfix_tmplt_len)
-    fmt.Println(ipfix_tmplt_fields)
-
 }
 
 func IPFIXParsePacket(packet []byte, agent_ip uint32,
