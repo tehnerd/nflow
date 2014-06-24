@@ -32,7 +32,7 @@ type IPFIXIETFElem struct {
 
 /*
     this is an emulated structure, which compatible with NFLOWv5's one.
-    (have same fields name etc). IPV6 only
+    (have same fields name etc). IPV4 only
 */
 type IPFIXGenericV4Record struct{
     Srcaddr uint32
@@ -53,7 +53,6 @@ type IPFIXGenericV4Record struct{
     Dst_as  uint16
     Src_mask    uint8
     Dst_mask    uint8
-    Pad2    uint16
 }
 
 
@@ -90,7 +89,6 @@ func IPFIXParseTmpltSet(packet []byte, agent_ip uint32,
     tmplt_header := IPFIXTmpltHeaderUnpack(packet)
     _,exist := ipfix_tmplt_len[agent_ip][tmplt_header.TmpltID][0]
     if exist {
-    fmt.Println(ipfix_tmplt_len)
         return
     }
 
@@ -118,17 +116,27 @@ func IPFIXParseTmpltSet(packet []byte, agent_ip uint32,
             offset += 8
         }
     }
-    fmt.Println(ipfix_tmplt_len)
+}
+
+func GenerateIPFIXGenericV4Record(record *IPFIXGenericV4Record, data_slice []byte,
+                                  field_type uint8 ){
 }
 
 func IPFIXParseDataSet(packet []byte, set_hdr *IPFIXSetHeader,
                        tmplt_fields_len map[uint16]uint16,
                        tmplt_fields_type map[uint16]uint8){
-    cntr := uint16(0)
+    //not sure how many records could be in ipfix set. gonna start from 41
+    flow_list := make([]IPFIXGenericV4Record, 41)
     for offset := uint16(20); offset < (*set_hdr).Length; {
-        offset_ends := offset + tmplt_fields_len[cntr] + 1
-        cntr++
-        offset = offset_ends
+        cntr := uint16(0)
+        var record IPFIXGenericV4Record
+        for ; cntr < uint16(len(tmplt_fields_len)); cntr++ {
+            offset_ends := offset + tmplt_fields_len[cntr] + 1
+            GenerateIPFIXGenericV4Record(&record, packet[offset:offset_ends],
+                                         tmplt_fields_type[cntr])
+            offset = offset_ends
+        }
+        flow_list = append(flow_list,record)
     }
 }
 
