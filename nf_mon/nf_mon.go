@@ -126,6 +126,7 @@ func main() {
 		vips_multiplier[uint32(vip_ip)] = uint8(vip_mult)
 		line, err = cfg_reader.ReadString('\n')
 	}
+    fd.Close()
 	var mutex sync.RWMutex
 	const nfport = ":5001"
 	fmt.Println("go lang go")
