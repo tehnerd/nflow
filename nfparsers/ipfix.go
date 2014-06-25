@@ -147,13 +147,13 @@ func GenerateIPFIXGenericV4Record(record *IPFIXGenericV4Record, data_slice []byt
 	case 15:
 		record.SetNexthop(bo.Uint32(data_slice))
 	case 10:
-		record.SetInput(bo.Uint16(data_slice))
+		record.SetInput(uint16(bo.Uint32(data_slice)))
 	case 14:
-		record.SetOutput(bo.Uint16(data_slice))
+		record.SetOutput(uint16(bo.Uint32(data_slice)))
 	case 2:
-		record.SetDPkts(bo.Uint32(data_slice))
+		record.SetDPkts(uint32(bo.Uint64(data_slice)))
 	case 1:
-		record.SetDOctets(bo.Uint32(data_slice))
+		record.SetDOctets(uint32(bo.Uint64(data_slice)))
 	case 21:
 		record.SetFirst(bo.Uint32(data_slice))
 	case 22:
