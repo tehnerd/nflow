@@ -57,8 +57,21 @@ func collect_flow(sock *net.UDPConn, mutex *sync.RWMutex,
 		n, addr, _ := sock.ReadFromUDP(buffer)
 		switch buffer[1] {
 		case 5:
-			{
-				flow_list := nfparsers.NFV5ParsePacket(buffer[:n])
+			flow_list := nfparsers.NFV5ParsePacket(buffer[:n])
+			for cntr := 0; cntr < len(flow_list); cntr++ {
+				mutex.RLock()
+				_, exist := vips_pps[flow_list[cntr].Dstaddr]
+				mutex.RUnlock()
+				if exist {
+					mutex.Lock()
+					vips_pps[flow_list[cntr].Dstaddr] += flow_list[cntr].DPkts
+					mutex.Unlock()
+				}
+			}
+		case 10:
+			flow_list := nfparsers.IPFIXParsePacket(buffer[:n], addr2uint32(addr),
+				ipfix_tmplt_len, ipfix_tmplt_fields)
+			if len(flow_list) != 0 {
 				for cntr := 0; cntr < len(flow_list); cntr++ {
 					mutex.RLock()
 					_, exist := vips_pps[flow_list[cntr].Dstaddr]
@@ -69,11 +82,6 @@ func collect_flow(sock *net.UDPConn, mutex *sync.RWMutex,
 						mutex.Unlock()
 					}
 				}
-			}
-		case 10:
-			{
-				nfparsers.IPFIXParsePacket(buffer[:n], addr2uint32(addr),
-					ipfix_tmplt_len, ipfix_tmplt_fields)
 			}
 		}
 	}
@@ -126,7 +134,7 @@ func main() {
 		vips_multiplier[uint32(vip_ip)] = uint8(vip_mult)
 		line, err = cfg_reader.ReadString('\n')
 	}
-    fd.Close()
+	fd.Close()
 	var mutex sync.RWMutex
 	const nfport = ":5001"
 	fmt.Println("go lang go")

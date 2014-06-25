@@ -130,6 +130,7 @@ func IPFIXParseTmpltSet(packet []byte, agent_ip uint32,
 			offset += 4
 
 		} else {
+			ipfix_tmplt_len[agent_ip][tmplt_header.TmpltID][cntr] = fspec.FieldLength
 			offset += 8
 		}
 	}
@@ -180,7 +181,7 @@ func GenerateIPFIXGenericV4Record(record *IPFIXGenericV4Record, data_slice []byt
 
 func IPFIXParseDataSet(packet []byte, set_hdr *IPFIXSetHeader,
 	tmplt_fields_len map[uint16]uint16,
-	tmplt_fields_type map[uint16]uint8) {
+	tmplt_fields_type map[uint16]uint8) []IPFIXGenericV4Record {
 	//not sure how many records could be in ipfix set. gonna start from 41
 	flow_list := make([]IPFIXGenericV4Record, 41)
 	bo := binary.BigEndian
@@ -188,27 +189,29 @@ func IPFIXParseDataSet(packet []byte, set_hdr *IPFIXSetHeader,
 		cntr := uint16(0)
 		var record IPFIXGenericV4Record
 		for ; cntr < uint16(len(tmplt_fields_len)); cntr++ {
-			offset_ends := offset + tmplt_fields_len[cntr] + 1
+			offset_ends := offset + tmplt_fields_len[cntr]
 			GenerateIPFIXGenericV4Record(&record, packet[offset:offset_ends],
 				tmplt_fields_type[cntr], bo)
 			offset = offset_ends
 		}
 		flow_list = append(flow_list, record)
 	}
+	return flow_list
 }
 
 func IPFIXParsePacket(packet []byte, agent_ip uint32,
 	ipfix_tmplt_len map[uint32]map[uint16]map[uint16]uint16,
-	ipfix_tmplt_fields map[uint32]map[uint16]map[uint16]uint8) {
+	ipfix_tmplt_fields map[uint32]map[uint16]map[uint16]uint8) []IPFIXGenericV4Record {
 	set_hdr := IPFIXSetHeaderUnpack(packet)
 	if set_hdr.SetID == 2 {
 		IPFIXParseTmpltSet(packet, agent_ip, ipfix_tmplt_len, ipfix_tmplt_fields)
 	} else {
 		_, exist := ipfix_tmplt_len[agent_ip][set_hdr.SetID][0]
 		if exist {
-			IPFIXParseDataSet(packet, &set_hdr, ipfix_tmplt_len[agent_ip][set_hdr.SetID],
+			flow_list := IPFIXParseDataSet(packet, &set_hdr, ipfix_tmplt_len[agent_ip][set_hdr.SetID],
 				ipfix_tmplt_fields[agent_ip][set_hdr.SetID])
-		} else {
+			return flow_list
 		}
 	}
+	return make([]IPFIXGenericV4Record, 0, 0)
 }
