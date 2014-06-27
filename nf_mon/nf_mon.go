@@ -12,12 +12,12 @@ import (
 	"time"
 )
 
-func inet_ntoa(ipnr int64) net.IP {
+func inet_ntoa(ip uint32) net.IP {
 	var bytes [4]byte
-	bytes[0] = byte(ipnr & 0xFF)
-	bytes[1] = byte((ipnr >> 8) & 0xFF)
-	bytes[2] = byte((ipnr >> 16) & 0xFF)
-	bytes[3] = byte((ipnr >> 24) & 0xFF)
+	bytes[0] = byte(ip & 0xFF)
+	bytes[1] = byte((ip >> 8) & 0xFF)
+	bytes[2] = byte((ip >> 16) & 0xFF)
+	bytes[3] = byte((ip >> 24) & 0xFF)
 	return net.IPv4(bytes[3], bytes[2], bytes[1], bytes[0])
 }
 
@@ -97,7 +97,8 @@ func analyze_stats(mutex *sync.RWMutex,
 		if v != uint32(0) {
 			if vips_baseline[k] != uint32(0) {
 				if v > 10 && v > vips_baseline[k]*uint32(vips_multiplier[k]) {
-					fmt.Println("possible ddos on")
+					fmt.Println("possible ddos on ", inet_ntoa(k), "multiplier:",
+						float32(v)/float32(vips_baseline[k]))
 					vips_flags[k] = uint8(1)
 				} else {
 					vips_flags[k] = uint8(0)
