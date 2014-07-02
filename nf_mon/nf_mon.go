@@ -3,8 +3,11 @@ package main
 import (
 	"bufio"
 	"fmt"
+	"github.com/garyburd/redigo/redis"
 	"net"
 	"nflow/nfparsers"
+	//this is higly environment specific so must be added by enduser
+	"nflow/notify"
 	"os"
 	"strconv"
 	"strings"
@@ -45,11 +48,28 @@ func string_to_uint32(ip string) uint32 {
 	return ip_uint32
 }
 
+func publish_to_redis(pub_chan_nf5 chan nfparsers.NFLOWv5Record,
+	pub_chan_ipfix chan nfparsers.IPFIXGenericV4Record) {
+	redis_connection, _ := redis.Dial("tcp", "127.0.0.1:6379")
+	var nf_struct nfparsers.NFLOWv5Record
+	var ipfix_struct nfparsers.IPFIXGenericV4Record
+	for {
+		select {
+		case nf_struct = <-pub_chan_nf5:
+			redis_connection.Do("PUBLISH", "nfmon_go", nf_struct)
+		case ipfix_struct = <-pub_chan_ipfix:
+			redis_connection.Do("PUBLISH", "nfmon_go", ipfix_struct)
+		}
+	}
+}
+
 func collect_flow(sock *net.UDPConn, mutex *sync.RWMutex,
 	vips_pps map[uint32]uint32,
 	vips_flags map[uint32]uint8,
 	vips_baseline map[uint32]uint32,
-	vips_multiplier map[uint32]uint8) {
+	vips_multiplier map[uint32]uint8,
+	pub_chan_nf5 chan nfparsers.NFLOWv5Record,
+	pub_chan_ipfix chan nfparsers.IPFIXGenericV4Record) {
 	buffer := make([]byte, 9000)
 	ipfix_tmplt_len := make(map[uint32]map[uint16]map[uint16]uint16)
 	ipfix_tmplt_fields := make(map[uint32]map[uint16]map[uint16]uint8)
@@ -59,6 +79,9 @@ func collect_flow(sock *net.UDPConn, mutex *sync.RWMutex,
 		case 5:
 			flow_list := nfparsers.NFV5ParsePacket(buffer[:n])
 			for cntr := 0; cntr < len(flow_list); cntr++ {
+				if flow_list[cntr].Srcaddr == 0 {
+					continue
+				}
 				mutex.RLock()
 				_, exist := vips_pps[flow_list[cntr].Dstaddr]
 				mutex.RUnlock()
@@ -66,6 +89,9 @@ func collect_flow(sock *net.UDPConn, mutex *sync.RWMutex,
 					mutex.Lock()
 					vips_pps[flow_list[cntr].Dstaddr] += flow_list[cntr].DPkts
 					mutex.Unlock()
+					if vips_flags[flow_list[cntr].Dstaddr] == 1 {
+						pub_chan_nf5 <- flow_list[cntr]
+					}
 				}
 			}
 		case 10:
@@ -73,6 +99,9 @@ func collect_flow(sock *net.UDPConn, mutex *sync.RWMutex,
 				ipfix_tmplt_len, ipfix_tmplt_fields)
 			if len(flow_list) != 0 {
 				for cntr := 0; cntr < len(flow_list); cntr++ {
+					if flow_list[cntr].Srcaddr == 0 {
+						continue
+					}
 					mutex.RLock()
 					_, exist := vips_pps[flow_list[cntr].Dstaddr]
 					mutex.RUnlock()
@@ -80,6 +109,9 @@ func collect_flow(sock *net.UDPConn, mutex *sync.RWMutex,
 						mutex.Lock()
 						vips_pps[flow_list[cntr].Dstaddr] += flow_list[cntr].DPkts
 						mutex.Unlock()
+						if vips_flags[flow_list[cntr].Dstaddr] == 1 {
+							pub_chan_ipfix <- flow_list[cntr]
+						}
 					}
 				}
 			}
@@ -97,8 +129,11 @@ func analyze_stats(mutex *sync.RWMutex,
 		if v != uint32(0) {
 			if vips_baseline[k] != uint32(0) {
 				if v > 10 && v > vips_baseline[k]*uint32(vips_multiplier[k]) {
+					msg_string := []string{"possible ddos on", inet_ntoa(k).String(), "multiplier",
+						strconv.Itoa(int(v / vips_baseline[k]))}
+					go notify.SendSMS(strings.Join(msg_string, " "))
 					fmt.Println("possible ddos on ", inet_ntoa(k), "multiplier:",
-						float32(v)/float32(vips_baseline[k]))
+						v/vips_baseline[k])
 					vips_flags[k] = uint8(1)
 				} else {
 					vips_flags[k] = uint8(0)
@@ -137,6 +172,8 @@ func main() {
 	}
 	fd.Close()
 	var mutex sync.RWMutex
+	nf5_redis_chan := make(chan nfparsers.NFLOWv5Record, 100)
+	ipfix_redis_chan := make(chan nfparsers.IPFIXGenericV4Record, 100)
 	const nfport = ":5001"
 	fmt.Println("go lang go")
 	sock_addr, _ := net.ResolveUDPAddr("udp", nfport)
@@ -145,7 +182,9 @@ func main() {
 		fmt.Println("cant open udp socket")
 		os.Exit(1)
 	}
-	go collect_flow(dsock, &mutex, vips_pps, vips_flags, vips_baseline, vips_multiplier)
+	go collect_flow(dsock, &mutex, vips_pps, vips_flags, vips_baseline,
+		vips_multiplier, nf5_redis_chan, ipfix_redis_chan)
+	go publish_to_redis(nf5_redis_chan, ipfix_redis_chan)
 	for {
 		time.Sleep(1 * time.Minute)
 		analyze_stats(&mutex, vips_pps, vips_flags, vips_baseline, vips_multiplier)
