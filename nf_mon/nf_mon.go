@@ -59,6 +59,8 @@ func publish_to_redis(pub_chan_nf5 chan nfparsers.NFLOWv5Record,
 			redis_connection.Do("PUBLISH", "nfmon_go", nf_struct)
 		case ipfix_struct = <-pub_chan_ipfix:
 			redis_connection.Do("PUBLISH", "nfmon_go", ipfix_struct)
+		case <-time.After(time.Second * 30):
+			redis_connection.Do("PUBLISH", "nfmon_go", "PING")
 		}
 	}
 }
