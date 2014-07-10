@@ -169,9 +169,9 @@ func GenerateIPFIXGenericV4Record(record *IPFIXGenericV4Record, data_slice []byt
 	case 5:
 		record.SetTos(uint8(data_slice[0]))
 	case 16:
-		record.SetSrc_as(bo.Uint16(data_slice))
+		record.SetSrc_as(uint16(bo.Uint32(data_slice)))
 	case 17:
-		record.SetDst_as(bo.Uint16(data_slice))
+		record.SetDst_as(uint16(bo.Uint32(data_slice)))
 	case 9:
 		record.SetSrc_mask(uint8(data_slice[0]))
 	case 13:

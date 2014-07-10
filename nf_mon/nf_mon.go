@@ -130,7 +130,8 @@ func analyze_stats(mutex *sync.RWMutex,
 	for k, v := range vips_pps {
 		if v != uint32(0) {
 			if vips_baseline[k] != uint32(0) {
-				if v > 10 && v > vips_baseline[k]*uint32(vips_multiplier[k]) {
+				if v > 10 && v < 100000 &&
+					v > vips_baseline[k]*uint32(vips_multiplier[k]) {
 					msg_string := []string{"possible ddos on", inet_ntoa(k).String(), "multiplier",
 						strconv.Itoa(int(v / vips_baseline[k]))}
 					go notify.SendSMS(strings.Join(msg_string, " "))
